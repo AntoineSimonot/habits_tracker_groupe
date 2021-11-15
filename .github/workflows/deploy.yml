@@ -1,0 +1,29 @@
+---
+
+name: Publish
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Deploy
+        env:
+          deploy_key: ${{secrets.deploy_key}}
+        run: |
+          mkdir -p ${HOME}/.ssh
+          printf "%s\n" "antoine.eqy.fr ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFF7ZEkBaVOUJfKguV4snrPO5tprbA5uX6y+HHcHTZyQ" > ${HOME}/.ssh/known_hosts
+          printf "%s\n" "$deploy_key" > ${HOME}/.ssh/id_ed25519
+          chmod 600 ${HOME}/.ssh/id_ed25519
+          eval $(ssh-agent)
+          ssh-add
+          rsync -a ./ antoine@antoine.eqy.fr:/home/antoine/src/
+          ssh antoine@antoine.eqy.fr /home/antoine/venv/bin/python -m pip install --upgrade setuptools wheel pip
+          ssh antoine@antoine.eqy.fr /home/antoine/venv/bin/python -m pip install django djangorestframework drf-nested-routers djangorestframework-simplejwt gunicorn
+          ssh antoine@antoine.eqy.fr /home/antoine/venv/bin/python /home/antoine/src/manage.py migrate
+          ssh antoine@antoine.eqy.fr /home/antoine/venv/bin/python /home/antoine/src/manage.py collectstatic
+          ssh antoine@antoine.eqy.fr sudo systemctl restart antoine.service
